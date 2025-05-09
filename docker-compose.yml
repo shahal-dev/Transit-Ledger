@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - SMTP_USER=${SMTP_USER}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3001}
+      - BASE_URL=${BASE_URL:-http://localhost:3001}
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:3001}
+    volumes:
+      - ./prisma:/app/prisma
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  pgadmin-data:
+
+networks:
+  transit-network:
+    driver: bridge 

@@ -1,0 +1,60 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+9:16:50 PM [express] serving on port 5000
+9:17:02 PM [express] GET /api/admin/users 403 in 5ms :: {"message":"Access denied: Admin only"}
+9:17:18 PM [express] WebSocket client connected
+9:17:18 PM [express] GET /api/user 304 in 174ms :: {"id":1,"username":"admin","fullName":"System Adm…
+Error fetching users: PrismaClientValidationError: 
+Invalid `prisma.user.findMany()` invocation in
+/home/calsifer/Desktop/windsurf/TransitLedger/server/admin.ts:17:39
+
+  14 // Get all users
+  15 app.get("/api/admin/users", isAdmin, async (req, res) => {
+  16   try {
+→ 17     const users = await prisma.user.findMany({
+           select: {
+             id: true,
+             username: true,
+             email: true,
+             fullName: true,
+             contactNumber: true,
+             ~~~~~~~~~~~~~
+             nidHash: true,
+             verified: true,
+             isAdmin: true,
+             createdAt: true,
+             wallet: {
+               select: {
+                 id: true,
+                 balance: true
+               }
+             },
+             _count: {
+               select: {
+                 tickets: true
+               }
+             },
+         ?   password?: true,
+         ?   phone?: true,
+         ?   verifications?: true,
+         ?   tickets?: true,
+         ?   emailVerifications?: true
+           }
+         })
+
+Unknown field `contactNumber` for select statement on model `User`. Available options are marked with ?.
+    at An (/home/calsifer/Desktop/windsurf/TransitLedger/node_modules/.prisma/client/runtime/library.js:32:1363)
+    at zn.handleRequestError (/home/calsifer/Desktop/windsurf/TransitLedger/node_modules/.prisma/client/runtime/library.js:124:7102)
+    at zn.handleAndLogRequestError (/home/calsifer/Desktop/windsurf/TransitLedger/node_modules/.prisma/client/runtime/library.js:124:6784)
+    at zn.request (/home/calsifer/Desktop/windsurf/TransitLedger/node_modules/.prisma/client/runtime/library.js:124:6491)
+    at async l (/home/calsifer/Desktop/windsurf/TransitLedger/node_modules/.prisma/client/runtime/library.js:133:9778)
+    at async <anonymous> (/home/calsifer/Desktop/windsurf/TransitLedger/server/admin.ts:17:21) {
+  clientVersion: '6.7.0'
+}
+9:17:18 PM [express] GET /api/admin/stations 200 in 163ms :: [{"id":1,"name":"Dhaka Central","city":…
+9:17:18 PM [express] GET /api/admin/users 500 in 173ms :: {"message":"Failed to fetch users"}
+9:17:18 PM [express] GET /api/admin/tickets 304 in 275ms :: []
+9:17:18 PM [express] GET /api/admin/trains 304 in 277ms :: []
+9:17:19 PM [express] GET /api/admin/stats 304 in 964ms :: {"userCount":1,"ticketCount":0,"trainCount…
