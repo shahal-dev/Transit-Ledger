@@ -33,7 +33,7 @@ RUN adduser --system --uid 1001 transit
 USER transit
 
 # Expose port
-EXPOSE 3001
+EXPOSE 5000
 
 # Start the app
 CMD ["yarn", "docker:start"] 
