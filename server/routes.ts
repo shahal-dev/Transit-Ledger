@@ -123,7 +123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       
-      // Use Prisma directly for this query to include seat schedules
+      // Use Prisma directly for this query to include seat schedules and berth schedules
       const schedule = await prisma.schedule.findUnique({
         where: { id },
         include: {
@@ -136,6 +136,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             },
             where: {
               isBooked: false
+            }
+          },
+          berthSchedules: {
+            include: {
+              berth: true
             }
           }
         }
@@ -182,46 +187,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Book a ticket
   app.post("/api/tickets/book", async (req, res, next) => {
     try {
+      console.log("Ticket booking request:", JSON.stringify(req.body));
+      
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
       const userId = req.user!.id;
-      const { scheduleId, seatNumber, seatScheduleId } = req.body;
+      console.log("User ID:", userId);
+      
+      const { scheduleId, seatNumber, seatScheduleId, berthScheduleId } = req.body;
+      console.log("Booking request details:", { scheduleId, seatNumber, seatScheduleId, berthScheduleId });
       
       // Check if schedule exists
       const schedule = await prisma.schedule.findUnique({
         where: { id: parseInt(scheduleId) },
-        include: { seatSchedules: true }
+        include: { seatSchedules: true, berthSchedules: true }
       });
       
       if (!schedule) {
         return res.status(404).json({ message: "Schedule not found" });
       }
       
-      // Check if schedule has available seats
-      if (schedule.availableSeats <= 0) {
-        return res.status(400).json({ message: "No seats available for this schedule" });
-      }
+      // First, clean up any expired pending tickets for this schedule to free up seats
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
       
-      // Check if user already has a ticket for this schedule
-      const userTickets = await prisma.ticket.findMany({
+      // Find expired pending tickets
+      const expiredTickets = await prisma.ticket.findMany({
         where: {
-          userId,
           scheduleId: parseInt(scheduleId),
-          status: { not: "cancelled" }
+          status: "booked",
+          paymentStatus: "pending",
+          issuedAt: { lt: thirtyMinutesAgo }
+        },
+        include: {
+          seatSchedule: true,
+          berthSchedule: true
         }
       });
       
-      if (userTickets.length > 0) {
-        return res.status(400).json({ 
-          message: "You already have a ticket for this train schedule" 
+      // Cancel expired tickets
+      for (const ticket of expiredTickets) {
+        await prisma.$transaction(async (tx) => {
+          // Update ticket status
+          await tx.ticket.update({
+            where: { id: ticket.id },
+            data: { 
+              status: "cancelled",
+              paymentStatus: "cancelled"
+            }
+          });
+          
+          // Increment available seats
+          await tx.schedule.update({
+            where: { id: parseInt(scheduleId) },
+            data: {
+              availableSeats: {
+                increment: 1
+              }
+            }
+          });
+          
+          // Release seat schedule if it exists
+          if (ticket.seatScheduleId) {
+            await tx.seatSchedule.update({
+              where: { id: ticket.seatScheduleId },
+              data: { isBooked: false }
+            });
+          }
+          
+          // Remove seat from booked seats in berth schedule if it exists
+          if (ticket.berthScheduleId && ticket.berthSchedule) {
+            const bookedSeats = JSON.parse(ticket.berthSchedule.bookedSeats || '[]');
+            const updatedBookedSeats = bookedSeats.filter((seat: string) => seat !== ticket.seatNumber);
+            
+            await tx.berthSchedule.update({
+              where: { id: ticket.berthScheduleId },
+              data: { 
+                bookedSeats: JSON.stringify(updatedBookedSeats)
+              }
+            });
+          }
         });
       }
       
-      // Find the seat schedule if provided
+      // Check if schedule has available seats (recheck after expired ticket cleanup)
+      const updatedSchedule = await prisma.schedule.findUnique({
+        where: { id: parseInt(scheduleId) }
+      });
+      
+      if (!updatedSchedule || updatedSchedule.availableSeats <= 0) {
+        return res.status(400).json({ message: "No seats available for this schedule" });
+      }
+      
+      // Additional check - see if user has any active tickets for this schedule
+      const userScheduleTickets = await prisma.ticket.findMany({
+        where: {
+          userId,
+          scheduleId: parseInt(scheduleId),
+          status: { not: "cancelled" },
+          OR: [
+            { paymentStatus: "completed" },
+            { 
+              paymentStatus: "pending",
+              issuedAt: { gte: thirtyMinutesAgo }
+            }
+          ]
+        }
+      });
+      
+      console.log("User's existing tickets for this schedule:", {
+        count: userScheduleTickets.length,
+        tickets: userScheduleTickets.map(t => ({
+          id: t.id,
+          seatNumber: t.seatNumber,
+          status: t.status,
+          paymentStatus: t.paymentStatus
+        }))
+      });
+      
+      // Prevent booking multiple tickets for the same schedule
+      if (userScheduleTickets.length > 0) {
+        return res.status(400).json({ 
+          message: "You already have a ticket for this train schedule." 
+        });
+      }
+      
+      // Check if the specific seat is already booked by someone else
+      const seatExistsForSchedule = await prisma.ticket.findFirst({
+        where: {
+          scheduleId: parseInt(scheduleId),
+          seatNumber,
+          status: { not: "cancelled" },
+          OR: [
+            { paymentStatus: "completed" },
+            { 
+              paymentStatus: "pending",
+              issuedAt: { gte: thirtyMinutesAgo }
+            }
+          ]
+        }
+      });
+      
+      if (seatExistsForSchedule) {
+        return res.status(400).json({ 
+          message: "This seat is already booked. Please select another seat." 
+        });
+      }
+      
+      // Variables to track seat information
       let seatSchedule;
-      if (seatScheduleId) {
+      let berthSchedule;
+      let price = 150; // Default price
+      
+      // Handle berth-based booking
+      if (berthScheduleId) {
+        berthSchedule = await prisma.berthSchedule.findUnique({
+          where: { id: parseInt(berthScheduleId.toString()) },
+          include: { berth: true }
+        });
+        
+        if (!berthSchedule) {
+          return res.status(404).json({ message: "Berth not found" });
+        }
+        
+        // Check if the seat is already booked (using first-come-first-serve logic)
+        const bookedSeats = JSON.parse(berthSchedule.bookedSeats || '[]');
+        
+        if (bookedSeats.includes(seatNumber)) {
+          return res.status(400).json({ 
+            message: "This seat is already booked. Please select another seat." 
+          });
+        }
+        
+        // Set price from berth schedule
+        price = berthSchedule.pricePerSeat;
+        
+      } 
+      // Handle legacy seat-based booking
+      else if (seatScheduleId) {
         seatSchedule = await prisma.seatSchedule.findUnique({
           where: { id: parseInt(seatScheduleId.toString()) },
           include: { seat: true }
@@ -239,6 +383,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (seatSchedule.seat.seatNumber !== seatNumber) {
           return res.status(400).json({ message: "Seat number doesn't match the selected seat" });
         }
+        
+        // Set price from seat schedule
+        price = seatSchedule.price;
       } else {
         // Check if seat is already taken (legacy method)
         const scheduleTickets = await prisma.ticket.findMany({
@@ -258,32 +405,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ticketHash = crypto.randomBytes(16).toString('hex');
       const qrCode = `TL-${scheduleId}-${userId}-${ticketHash.substring(0, 8)}`;
       
-      // Create a new ticket
-      const ticket = await prisma.ticket.create({
-        data: {
-          userId,
-          scheduleId: parseInt(scheduleId),
-          seatNumber,
-          paymentId: null,
-          paymentStatus: "pending",
-          ticketHash,
-          qrCode,
-          status: "booked",
-          price: seatSchedule ? seatSchedule.price : 150,
-          seatScheduleId: seatSchedule ? seatSchedule.id : null
+      // Create a new ticket in a transaction to ensure atomicity
+      const ticket = await prisma.$transaction(async (tx) => {
+        // 1. Create the ticket
+        const newTicket = await tx.ticket.create({
+          data: {
+            userId,
+            scheduleId: parseInt(scheduleId),
+            seatNumber,
+            paymentId: null,
+            paymentStatus: "pending",
+            ticketHash,
+            qrCode,
+            status: "booked",
+            price,
+            seatScheduleId: seatSchedule ? seatSchedule.id : null,
+            berthScheduleId: berthSchedule ? berthSchedule.id : null
+          }
+        });
+        
+        // 2. Update available seats in schedule
+        await tx.schedule.update({
+          where: { id: parseInt(scheduleId) },
+          data: {
+            availableSeats: {
+              decrement: 1
+            }
+          }
+        });
+        
+        // 3. Mark legacy seat as booked if using seatScheduleId
+        if (seatSchedule) {
+          await tx.seatSchedule.update({
+            where: { id: seatSchedule.id },
+            data: { isBooked: true }
+          });
         }
+        
+        // 4. Add seat to bookedSeats array if using berthScheduleId
+        if (berthSchedule) {
+          const bookedSeats = JSON.parse(berthSchedule.bookedSeats || '[]');
+          bookedSeats.push(seatNumber);
+          
+          await tx.berthSchedule.update({
+            where: { id: berthSchedule.id },
+            data: { 
+              bookedSeats: JSON.stringify(bookedSeats)
+            }
+          });
+        }
+        
+        return newTicket;
       });
       
-      // Mark the seat as booked in the seat schedule if provided
-      if (seatSchedule) {
-        await prisma.seatSchedule.update({
-          where: { id: seatSchedule.id },
-          data: { isBooked: true }
-        });
-      }
-      
-      res.status(201).json(ticket);
+      res.json(ticket);
     } catch (error) {
+      console.error('Error booking ticket:', error);
       next(error);
     }
   });
@@ -384,10 +561,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const id = parseInt(req.params.id);
       
-      // Use Prisma to get the ticket with the seat schedule
+      // Use Prisma to get the ticket with the seat schedule and berth schedule
       const ticket = await prisma.ticket.findUnique({
         where: { id },
-        include: { seatSchedule: true }
+        include: { 
+          seatSchedule: true,
+          berthSchedule: {
+            include: { berth: true }
+          }
+        }
       });
       
       if (!ticket) {
@@ -410,32 +592,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cannot cancel a used ticket" });
       }
       
-      // Update ticket status
-      const updatedTicket = await prisma.ticket.update({
-        where: { id },
-        data: { 
-          status: "cancelled",
-          paymentStatus: "cancelled"
-        }
-      });
-      
-      // Update schedule available seats
-      await prisma.schedule.update({
-        where: { id: ticket.scheduleId },
-        data: {
-          availableSeats: {
-            increment: 1
+      // Update ticket status and related records in a transaction
+      const updatedTicket = await prisma.$transaction(async (tx) => {
+        // 1. Update ticket status
+        const updated = await tx.ticket.update({
+          where: { id },
+          data: { 
+            status: "cancelled",
+            paymentStatus: "cancelled"
           }
-        }
-      });
-      
-      // If there's a seat schedule, mark it as not booked
-      if (ticket.seatScheduleId) {
-        await prisma.seatSchedule.update({
-          where: { id: ticket.seatScheduleId },
-          data: { isBooked: false }
         });
-      }
+        
+        // 2. Update schedule available seats
+        await tx.schedule.update({
+          where: { id: ticket.scheduleId },
+          data: {
+            availableSeats: {
+              increment: 1
+            }
+          }
+        });
+        
+        // 3. Handle legacy seat schedule
+        if (ticket.seatScheduleId) {
+          await tx.seatSchedule.update({
+            where: { id: ticket.seatScheduleId },
+            data: { isBooked: false }
+          });
+        }
+        
+        // 4. Handle berth schedule - remove seat from booked seats array
+        if (ticket.berthScheduleId) {
+          const berthSchedule = ticket.berthSchedule!;
+          const bookedSeats = JSON.parse(berthSchedule.bookedSeats || '[]');
+          const updatedBookedSeats = bookedSeats.filter((seat: string) => seat !== ticket.seatNumber);
+          
+          await tx.berthSchedule.update({
+            where: { id: ticket.berthScheduleId },
+            data: { 
+              bookedSeats: JSON.stringify(updatedBookedSeats)
+            }
+          });
+        }
+        
+        return updated;
+      });
       
       res.json(updatedTicket);
     } catch (error) {

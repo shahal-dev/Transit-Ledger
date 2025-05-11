@@ -44,11 +44,11 @@ export default function PaymentForm({ ticket, onPaymentComplete }: PaymentFormPr
   const [step, setStep] = useState<"payment" | "processing" | "confirmation">("payment");
   const [transactionId, setTransactionId] = useState<string>("");
   const { useInitiatePayment, useVerifyPayment } = useWallet();
-  const { useTicket } = useTickets();
+  const { useTicketDetails } = useTickets();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   
-  const { data: ticketDetails, refetch } = useTicket(ticket.id);
+  const { data: ticketDetails, refetch } = useTicketDetails(ticket.id);
   
   const initiatePaymentMutation = useInitiatePayment();
   const verifyPaymentMutation = useVerifyPayment();

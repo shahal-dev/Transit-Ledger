@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTickets } from "@/hooks/use-tickets";
+import { useTickets, Ticket as TicketType } from "@/hooks/use-tickets";
 import { Helmet } from "react-helmet";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,15 +17,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Ticket } from "@shared/types";
+
+// Temporary type for compatibility
+type Ticket = any;
 
 export default function MyTicketsPage() {
-  const { useMyTickets, useCancelTicket } = useTickets();
+  const { useUserTickets, useCancelTicket } = useTickets();
   const [, navigate] = useLocation();
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   
-  const { data: tickets = [], isLoading, error } = useMyTickets();
+  const { data: tickets = [], isLoading, error } = useUserTickets();
   const cancelTicketMutation = useCancelTicket();
   
   const handleCancelTicket = async (ticketId: number) => {
@@ -37,15 +39,15 @@ export default function MyTicketsPage() {
   };
   
   // Filter tickets by status
-  const upcomingTickets = tickets.filter((ticket: Ticket) =>
+  const upcomingTickets = (tickets as Ticket[]).filter((ticket: Ticket) =>
     ticket.paymentStatus === "completed" && new Date(ticket.schedule.journeyDate) > new Date()
   );
   
-  const pastTickets = tickets.filter((ticket: Ticket) =>
+  const pastTickets = (tickets as Ticket[]).filter((ticket: Ticket) =>
     ticket.paymentStatus === "completed" && new Date(ticket.schedule.journeyDate) <= new Date()
   );
   
-  const cancelledTickets = tickets.filter((ticket: Ticket) =>
+  const cancelledTickets = (tickets as Ticket[]).filter((ticket: Ticket) =>
     ticket.paymentStatus === "cancelled"
   );
   
@@ -67,7 +69,7 @@ export default function MyTicketsPage() {
   // Helper function to render ticket status badge
   const getStatusBadge = (status: string, paymentStatus: string) => {
     if (status === "cancelled") {
-      return <span className="px-2 py-1 text-xs rounded-full bg-destructive bg-opacity-10 text-destructive">Cancelled</span>;
+      return <span className="px-2 py-1 text-xs rounded-full bg-destructive bg-opacity-10 text-destructive text-white">Cancelled</span>;
     }
     
     if (status === "used") {

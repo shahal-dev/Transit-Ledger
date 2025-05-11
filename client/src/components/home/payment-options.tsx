@@ -6,13 +6,14 @@ export default function PaymentOptions() {
         
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           <div className="text-center">
-            <div className="bg-[url('https://images.unsplash.com/photo-1587105206188-27d9e89b1681?auto=format&q=80&w=800')] mx-auto rounded-lg shadow-md mb-4 h-48 bg-cover bg-center"></div>
+            <div className="bg-[url('https://www.idfcfirstbank.com/content/dam/idfcfirstbank/images/blog/mobile-banking/benefits-of-mobile-banking-for-business-717x404.jpg')] mx-auto rounded-lg shadow-md mb-4 h-48 bg-cover bg-center"></div>
             <h3 className="font-semibold text-lg mb-2">Mobile Banking</h3>
             <p className="text-neutral">Pay directly from your mobile banking accounts with bKash, Nagad, and Rocket.</p>
           </div>
           
           <div className="text-center">
-            <div className="bg-[url('https://images.unsplash.com/photo-1556741533-6e6a62bd8b49?auto=format&q=80&w=800')] mx-auto rounded-lg shadow-md mb-4 h-48 bg-cover bg-center"></div>
+            <div className="bg-[url('https://plus.unsplash.com/premium_photo-1664202219850-0ed2a085aaa9?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')] mx-auto rounded-lg shadow-md mb-4 h-48 bg-cover bg-center"></div>
+
             <h3 className="font-semibold text-lg mb-2">Card Payment</h3>
             <p className="text-neutral">Use your debit or credit cards for secure, instant payment processing.</p>
           </div>

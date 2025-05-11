@@ -17,9 +17,10 @@ export default function HomePage() {
       </Helmet>
       
       <HeroSection />
+      <TicketSearch />
+
       <FeaturesSection />
       <HowItWorks />
-      <TicketSearch />
       <PaymentOptions />
       <QRVerification />
       <Testimonials />

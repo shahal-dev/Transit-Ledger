@@ -16,9 +16,9 @@ interface PaymentPageProps {
 export default function PaymentPage({ params }: PaymentPageProps) {
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const { useTicket } = useTickets();
+  const { useTicketDetails } = useTickets();
   const ticketId = parseInt(params.id);
-  const { data: ticket, isLoading, error } = useTicket(ticketId);
+  const { data: ticket, isLoading, error } = useTicketDetails(ticketId);
   
   useEffect(() => {
     if (ticket) {

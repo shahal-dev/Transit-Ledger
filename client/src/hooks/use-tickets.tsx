@@ -1,6 +1,125 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { useToast } from "@/hooks/use-toast";
+
+// Types
+export interface Ticket {
+  id: number;
+  userId: number;
+  scheduleId: number;
+  seatNumber: string;
+  ticketHash: string;
+  qrCode: string;
+  status: string;
+  price: number;
+  issuedAt: string;
+  paymentStatus: string;
+  paymentId: string | null;
+  seatScheduleId: number | null;
+  berthScheduleId: number | null;
+  schedule?: {
+    id: number;
+    departureTime: string;
+    arrivalTime: string;
+    journeyDate: string;
+    fromStation: {
+      id: number;
+      name: string;
+    };
+    toStation: {
+      id: number;
+      name: string;
+    };
+    train: {
+      id: number;
+      name: string;
+      trainNumber: string;
+    };
+  };
+}
+
+export interface BookTicketParams {
+  scheduleId: number | string;
+  seatNumber: string;
+  seatScheduleId?: number | string;
+  berthScheduleId?: number | string;
+}
+
+// Custom hooks for ticket operations
+export function useUserTickets() {
+  return useQuery({
+    queryKey: ["tickets"],
+    queryFn: async () => {
+      const { data } = await axios.get<Ticket[]>("/api/tickets/my");
+      return data;
+    }
+  });
+}
+
+export function useTicketDetails(ticketId: number | string | undefined) {
+  return useQuery({
+    queryKey: ["ticket", ticketId],
+    queryFn: async () => {
+      if (!ticketId) return null;
+      const { data } = await axios.get<Ticket>(`/api/tickets/${ticketId}`);
+      return data;
+    },
+    enabled: !!ticketId
+  });
+}
+
+export function useBookTicket() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: async (params: BookTicketParams) => {
+      const { data } = await axios.post<Ticket>("/api/tickets/book", params);
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Ticket reserved",
+        description: "Your ticket has been reserved. Please complete the payment.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Booking failed",
+        description: error.response?.data?.message || error.message,
+        variant: "destructive",
+      });
+    }
+  });
+}
+
+export function useCancelTicket() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: async (ticketId: number) => {
+      const { data } = await axios.post<Ticket>(`/api/tickets/${ticketId}/cancel`);
+      return data;
+    },
+    onSuccess: (_, ticketId) => {
+      toast({
+        title: "Ticket cancelled",
+        description: "Your ticket has been cancelled successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket", ticketId] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Cancellation failed",
+        description: error.response?.data?.message || error.message,
+        variant: "destructive",
+      });
+    }
+  });
+}
 
 export function useTickets() {
   const { toast } = useToast();
@@ -11,6 +130,10 @@ export function useTickets() {
     
     return useQuery({
       queryKey,
+      queryFn: async () => {
+        const { data } = await axios.get(date ? `/api/schedules?date=${date}` : '/api/schedules');
+        return data;
+      },
       refetchOnWindowFocus: false,
     });
   };
@@ -19,6 +142,10 @@ export function useTickets() {
   const useStations = () => {
     return useQuery({
       queryKey: ['/api/stations'],
+      queryFn: async () => {
+        const { data } = await axios.get('/api/stations');
+        return data;
+      },
       refetchOnWindowFocus: false,
     });
   };
@@ -27,75 +154,13 @@ export function useTickets() {
   const useSchedule = (id: number) => {
     return useQuery({
       queryKey: [`/api/schedules/${id}`],
+      queryFn: async () => {
+        if (!id) return null;
+        const { data } = await axios.get(`/api/schedules/${id}`);
+        return data;
+      },
       enabled: !!id,
       refetchOnWindowFocus: false,
-    });
-  };
-
-  // Book a ticket
-  const useBookTicket = () => {
-    return useMutation({
-      mutationFn: async (data: { scheduleId: number, seatNumber: string, seatScheduleId?: number }) => {
-        const res = await apiRequest("POST", "/api/tickets/book", data);
-        return await res.json();
-      },
-      onSuccess: () => {
-        toast({
-          title: "Ticket reserved",
-          description: "Your ticket has been reserved. Please complete the payment.",
-        });
-        // Invalidate tickets query
-        queryClient.invalidateQueries({ queryKey: ['/api/tickets/my'] });
-      },
-      onError: (error: Error) => {
-        toast({
-          title: "Booking failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      },
-    });
-  };
-
-  // Get user tickets
-  const useMyTickets = () => {
-    return useQuery({
-      queryKey: ['/api/tickets/my'],
-      refetchOnWindowFocus: false,
-    });
-  };
-
-  // Get ticket by ID
-  const useTicket = (id: number) => {
-    return useQuery({
-      queryKey: [`/api/tickets/${id}`],
-      enabled: !!id,
-      refetchOnWindowFocus: false,
-    });
-  };
-
-  // Cancel a ticket
-  const useCancelTicket = () => {
-    return useMutation({
-      mutationFn: async (id: number) => {
-        const res = await apiRequest("POST", `/api/tickets/${id}/cancel`);
-        return await res.json();
-      },
-      onSuccess: () => {
-        toast({
-          title: "Ticket cancelled",
-          description: "Your ticket has been cancelled successfully.",
-        });
-        // Invalidate tickets query
-        queryClient.invalidateQueries({ queryKey: ['/api/tickets/my'] });
-      },
-      onError: (error: Error) => {
-        toast({
-          title: "Cancellation failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      },
     });
   };
 
@@ -103,8 +168,8 @@ export function useTickets() {
   const useVerifyTicket = () => {
     return useMutation({
       mutationFn: async (data: { ticketHash: string, nidHash?: string, location?: string }) => {
-        const res = await apiRequest("POST", "/api/tickets/verify", data);
-        return await res.json();
+        const { data: responseData } = await axios.post("/api/tickets/verify", data);
+        return responseData;
       },
       onSuccess: (data) => {
         toast({
@@ -112,10 +177,10 @@ export function useTickets() {
           description: `Valid ticket for ${data.user.fullName}.`,
         });
       },
-      onError: (error: Error) => {
+      onError: (error: any) => {
         toast({
           title: "Verification failed",
-          description: error.message,
+          description: error.response?.data?.message || error.message,
           variant: "destructive",
         });
       },
@@ -126,9 +191,9 @@ export function useTickets() {
     useSchedules,
     useStations,
     useSchedule,
+    useUserTickets,
+    useTicketDetails,
     useBookTicket,
-    useMyTickets,
-    useTicket,
     useCancelTicket,
     useVerifyTicket,
   };

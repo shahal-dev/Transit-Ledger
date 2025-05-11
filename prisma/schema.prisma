@@ -93,6 +93,7 @@ model Train {
   // Relations
   schedules Schedule[]
   seats     Seat[]
+  berths    Berth[]
 
   @@map("trains")
 }
@@ -127,11 +128,12 @@ model Schedule {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relations
-  train         Train          @relation(fields: [trainId], references: [id])
-  fromStation   Station        @relation("departureStation", fields: [fromStationId], references: [id])
-  toStation     Station        @relation("arrivalStation", fields: [toStationId], references: [id])
-  tickets       Ticket[]
-  seatSchedules SeatSchedule[]
+  train          Train          @relation(fields: [trainId], references: [id])
+  fromStation    Station        @relation("departureStation", fields: [fromStationId], references: [id])
+  toStation      Station        @relation("arrivalStation", fields: [toStationId], references: [id])
+  tickets        Ticket[]
+  seatSchedules  SeatSchedule[]
+  berthSchedules BerthSchedule[]
 
   @@map("schedules")
 }
@@ -188,12 +190,14 @@ model Ticket {
   status        String   @default("booked")
   metadata      Json?
   seatScheduleId Int?   @unique @map("seat_schedule_id")
+  berthScheduleId Int?  @map("berth_schedule_id")
 
   // Relations
-  user          User                 @relation(fields: [userId], references: [id])
-  schedule      Schedule             @relation(fields: [scheduleId], references: [id])
-  verifications TicketVerification[]
-  seatSchedule  SeatSchedule?        @relation(fields: [seatScheduleId], references: [id])
+  user           User                 @relation(fields: [userId], references: [id])
+  schedule       Schedule             @relation(fields: [scheduleId], references: [id])
+  verifications  TicketVerification[]
+  seatSchedule   SeatSchedule?        @relation(fields: [seatScheduleId], references: [id])
+  berthSchedule  BerthSchedule?       @relation(fields: [berthScheduleId], references: [id])
 
   @@map("tickets")
 }
@@ -233,4 +237,41 @@ model Session {
   expire DateTime
 
   @@map("session")
+}
+
+model Berth {
+  id            Int      @id @default(autoincrement())
+  trainId       Int      @map("train_id")
+  type          String   // Ac_b, AC_s, Snigdha, F_berth, F_seat, F chair, S-chair, Shovon, Shulov, Ac_chair
+  coachNumber   Int      @map("coach_number") 
+  seatsPerCoach Int      @map("seats_per_coach") @default(80) // Default 4x20 = 80 seats
+  totalSeats    Int      @map("total_seats")
+  status        String   @default("active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  train           Train           @relation(fields: [trainId], references: [id])
+  berthSchedules  BerthSchedule[]
+  
+  @@unique([trainId, coachNumber, type])
+  @@map("berths")
+}
+
+model BerthSchedule {
+  id         Int      @id @default(autoincrement())
+  scheduleId Int      @map("schedule_id")
+  berthId    Int      @map("berth_id")
+  pricePerSeat Float    @default(0.0) @map("price_per_seat")
+  bookedSeats Json     @default("[]") @map("booked_seats") // Array of booked seat numbers ["A1", "B3", etc]
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  schedule Schedule @relation(fields: [scheduleId], references: [id])
+  berth    Berth    @relation(fields: [berthId], references: [id])
+  tickets  Ticket[] // Tickets for this berth schedule
+
+  @@unique([scheduleId, berthId])
+  @@map("berth_schedules")
 }

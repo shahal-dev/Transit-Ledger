@@ -45,7 +45,11 @@ export default function Header() {
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center space-x-2">
           <Link href="/" className="flex items-center space-x-2">
-            <span className="material-icons text-primary text-2xl">train</span>
+            <img 
+              src="/images/logo.png" 
+              alt="TransitLedger Logo" 
+              className="h-10 w-auto"
+            />
             <div>
               <h1 className="text-primary font-bold text-xl">TransitLedger</h1>
               <p className="text-xs text-neutral">Modern Railway Ticketing</p>

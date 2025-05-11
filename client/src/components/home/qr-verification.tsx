@@ -4,7 +4,7 @@ export default function QRVerification() {
       <div className="container mx-auto px-4">
         <div className="md:flex items-center gap-8 max-w-5xl mx-auto">
           <div className="md:w-1/2 mb-8 md:mb-0">
-            <div className="bg-[url('https://images.unsplash.com/photo-1598618589929-b1433d05cdb3?auto=format&q=80&w=800')] rounded-lg shadow-lg mx-auto h-64 bg-cover bg-center"></div>
+            <div className="bg-[url('https://images.unsplash.com/photo-1571867424488-4565932edb41?q=80&w=3087&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')] rounded-lg shadow-lg mx-auto h-64 bg-cover bg-center"></div>
           </div>
           
           <div className="md:w-1/2">
@@ -14,7 +14,7 @@ export default function QRVerification() {
             <div className="space-y-4">
               <div className="flex items-start">
                 <div className="bg-primary bg-opacity-10 p-2 rounded-full mt-1 mr-4">
-                  <span className="material-icons text-primary">check</span>
+                  <span className="material-icons text-white">check</span>
                 </div>
                 <div>
                   <h3 className="font-semibold mb-1">Paperless Tickets</h3>
@@ -24,7 +24,7 @@ export default function QRVerification() {
               
               <div className="flex items-start">
                 <div className="bg-primary bg-opacity-10 p-2 rounded-full mt-1 mr-4">
-                  <span className="material-icons text-primary">check</span>
+                  <span className="material-icons text-white">check</span>
                 </div>
                 <div>
                   <h3 className="font-semibold mb-1">Quick Verification</h3>
@@ -34,7 +34,7 @@ export default function QRVerification() {
               
               <div className="flex items-start">
                 <div className="bg-primary bg-opacity-10 p-2 rounded-full mt-1 mr-4">
-                  <span className="material-icons text-primary">check</span>
+                  <span className="material-icons text-white">check</span>
                 </div>
                 <div>
                   <h3 className="font-semibold mb-1">Secure System</h3>

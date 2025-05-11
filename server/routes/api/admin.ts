@@ -441,7 +441,7 @@ router.post('/seat-schedules', isAdmin, async (req, res) => {
       // Create a seat schedule for a specific seat and schedule
       const newSeatSchedule = await prisma.seatSchedule.create({
         data: {
-          scheduleId: scheduleId,
+          scheduleId,
           seatId: seatId,
           price: updates.price || 0,
           isBooked: false
@@ -545,6 +545,222 @@ router.get('/stations', isAdmin, async (req, res) => {
   } catch (error) {
     console.error('Error fetching stations:', error);
     res.status(500).json({ error: 'Failed to fetch stations' });
+  }
+});
+
+// Berth management
+router.post('/berths/manage', isAdmin, async (req, res) => {
+  try {
+    const { action, data } = req.body;
+    
+    if (action === 'create') {
+      // Create a new berth
+      const berth = await prisma.berth.create({
+        data: {
+          trainId: data.trainId,
+          type: data.type,
+          coachNumber: data.coachNumber,
+          seatsPerCoach: data.seatsPerCoach,
+          totalSeats: data.totalSeats,
+          status: 'active'
+        }
+      });
+      
+      res.json({ message: 'Berth created successfully', berth });
+    } 
+    else if (action === 'update') {
+      // Update an existing berth
+      const berth = await prisma.berth.update({
+        where: { 
+          id: data.id 
+        },
+        data: {
+          type: data.type,
+          coachNumber: data.coachNumber,
+          seatsPerCoach: data.seatsPerCoach,
+          totalSeats: data.totalSeats,
+          status: data.status
+        }
+      });
+      
+      res.json({ message: 'Berth updated successfully', berth });
+    } 
+    else if (action === 'delete') {
+      // Check if there are any berth schedules for this berth
+      const berthSchedules = await prisma.berthSchedule.findMany({
+        where: { berthId: data.id }
+      });
+      
+      if (berthSchedules.length > 0) {
+        // Just mark as inactive instead of deleting
+        await prisma.berth.update({
+          where: { id: data.id },
+          data: { status: 'inactive' }
+        });
+        
+        res.json({ message: 'Berth marked as inactive (has schedules)' });
+      } else {
+        // Safe to delete
+        await prisma.berth.delete({
+          where: { id: data.id }
+        });
+        
+        res.json({ message: 'Berth deleted successfully' });
+      }
+    } 
+    else {
+      res.status(400).json({ error: 'Invalid action specified' });
+    }
+  } catch (error: any) {
+    console.error('Error managing berth:', error);
+    
+    if (error.code === 'P2002') {
+      res.status(400).json({ error: 'A berth with this coach number already exists for this train' });
+    } else {
+      res.status(500).json({ error: 'Failed to manage berth' });
+    }
+  }
+});
+
+// Get all berths
+router.get('/berths', isAdmin, async (req, res) => {
+  try {
+    const berths = await prisma.berth.findMany({
+      include: {
+        train: {
+          select: {
+            id: true,
+            name: true,
+            trainNumber: true
+          }
+        }
+      },
+      orderBy: [
+        { trainId: 'asc' },
+        { coachNumber: 'asc' }
+      ]
+    });
+    
+    res.json(berths);
+  } catch (error) {
+    console.error('Error fetching berths:', error);
+    res.status(500).json({ error: 'Failed to fetch berths' });
+  }
+});
+
+// Berth schedule management
+router.post('/berth-schedules/manage', isAdmin, async (req, res) => {
+  try {
+    const { action, scheduleId, data } = req.body;
+    
+    if (action === 'create') {
+      // Create a new berth schedule
+      const berthSchedule = await prisma.berthSchedule.create({
+        data: {
+          scheduleId,
+          berthId: data.berthId,
+          pricePerSeat: data.pricePerSeat,
+          bookedSeats: '[]'
+        }
+      });
+      
+      res.json({ message: 'Berth schedule created successfully', berthSchedule });
+    } 
+    else if (action === 'update') {
+      // Update an existing berth schedule
+      const berthSchedule = await prisma.berthSchedule.update({
+        where: { 
+          id: data.id 
+        },
+        data: {
+          pricePerSeat: data.pricePerSeat
+        }
+      });
+      
+      res.json({ message: 'Berth schedule updated successfully', berthSchedule });
+    } 
+    else if (action === 'delete') {
+      // Check if there are any tickets for this berth schedule
+      const tickets = await prisma.ticket.findMany({
+        where: { berthScheduleId: data.id }
+      });
+      
+      if (tickets.length > 0) {
+        res.status(400).json({ error: 'Cannot delete berth schedule with existing tickets' });
+      } else {
+        // Safe to delete
+        await prisma.berthSchedule.delete({
+          where: { id: data.id }
+        });
+        
+        res.json({ message: 'Berth schedule deleted successfully' });
+      }
+    }
+    else if (action === 'create-bulk') {
+      // Create berth schedules for multiple berths with pricing by berth type
+      const schedule = await prisma.schedule.findUnique({
+        where: { id: scheduleId }
+      });
+      
+      if (!schedule) {
+        return res.status(404).json({ error: 'Schedule not found' });
+      }
+      
+      // Get berths to schedule
+      const berths = await prisma.berth.findMany({
+        where: {
+          id: { in: data.berthIds },
+          status: 'active'
+        }
+      });
+      
+      if (berths.length === 0) {
+        return res.status(400).json({ error: 'No valid berths selected' });
+      }
+      
+      // Create a berth schedule for each berth with price from priceMap
+      const results = await Promise.all(
+        berths.map(berth => 
+          prisma.berthSchedule.create({
+            data: {
+              scheduleId,
+              berthId: berth.id,
+              pricePerSeat: data.priceMap[berth.type] || 0,
+              bookedSeats: '[]'
+            }
+          })
+        )
+      );
+      
+      // Update the available seats count in the schedule
+      const totalNewSeats = berths.reduce((sum, berth) => sum + berth.totalSeats, 0);
+      
+      await prisma.schedule.update({
+        where: { id: scheduleId },
+        data: {
+          availableSeats: {
+            increment: totalNewSeats
+          }
+        }
+      });
+      
+      res.json({ 
+        message: `Created ${results.length} berth schedules successfully`, 
+        count: results.length,
+        totalSeats: totalNewSeats
+      });
+    }
+    else {
+      res.status(400).json({ error: 'Invalid action specified' });
+    }
+  } catch (error: any) {
+    console.error('Error managing berth schedule:', error);
+    
+    if (error.code === 'P2002') {
+      res.status(400).json({ error: 'This berth is already scheduled for this journey' });
+    } else {
+      res.status(500).json({ error: 'Failed to manage berth schedule' });
+    }
   }
 });
 

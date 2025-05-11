@@ -23,7 +23,7 @@ export default function HeroSection() {
       
       {/* Decorative Background */}
       <div className="absolute inset-0 z-0">
-        <div className="object-cover w-full h-full opacity-20 bg-[url('https://images.unsplash.com/photo-1555661530-68c8e98db4e6?auto=format&q=80&w=2000')]"></div>
+        <div className="object-cover w-full h-full opacity-20 bg-[url('https://images.unsplash.com/photo-1713104343256-57f058ed1474?w=1500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1yZWxhdGVkfDYzfHx8ZW58MHx8fHx8')]"></div>
       </div>
       
       {/* Animated Train Icon */}
