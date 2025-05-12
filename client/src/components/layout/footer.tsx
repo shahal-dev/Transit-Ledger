@@ -70,7 +70,7 @@ export default function Footer() {
             <ul className="space-y-2 text-primary-foreground/80">
               <li className="flex items-center">
                 <span className="material-icons text-sm mr-2">location_on</span>
-                <span>Kamalapur, Dhaka, Bangladesh</span>
+                <span>BAshundhara R/A, Dhaka, Bangladesh</span>
               </li>
               <li className="flex items-center">
                 <span className="material-icons text-sm mr-2">phone</span>
@@ -78,7 +78,7 @@ export default function Footer() {
               </li>
               <li className="flex items-center">
                 <span className="material-icons text-sm mr-2">email</span>
-                <span>support@transitledger.com</span>
+                <span>transitledger@gmail.com</span>
               </li>
             </ul>
           </div>
