@@ -386,4 +386,71 @@ export function setupAuth(app: Express) {
       next(error);
     }
   });
+
+  // Admin login route
+  app.post("/api/admin/login", loginLimiter, async (req, res, next) => {
+    try {
+      const { username, password } = req.body;
+
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      
+      if (!user || !(await comparePasswords(password, user.password))) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (!user.isAdmin) {
+        return res.status(403).json({ message: "This account does not have administrator privileges" });
+      }
+
+      // Log in the user
+      req.login(user, (err) => {
+        if (err) {
+          return next(err);
+        }
+        res.json(user);
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // User management routes
+  app.post("/api/admin/users/:userId/:action", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !(req.user as SelectUser).isAdmin) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const { userId, action } = req.params;
+      const user = await storage.getUser(parseInt(userId));
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      switch (action) {
+        case "verify":
+          await storage.verifyUser(user.id);
+          res.json({ message: "User verified successfully" });
+          break;
+
+        case "resetPassword":
+          // Generate a random password
+          const newPassword = randomBytes(8).toString("hex");
+          const hashedPassword = await hashPassword(newPassword);
+          await storage.updateUser(user.id, { password: hashedPassword });
+          res.json({ message: "Password reset successfully", newPassword });
+          break;
+
+        default:
+          res.status(400).json({ message: "Invalid action" });
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
 }

@@ -12,6 +12,63 @@ const isAdmin = (req: any, res: any, next: any) => {
   next();
 };
 
+// Dashboard statistics
+router.get('/stats', isAdmin, async (req, res) => {
+  try {
+    const [
+      totalUsers,
+      totalTrains,
+      totalStations,
+      totalSchedules,
+      totalTickets,
+      totalRevenue
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.train.count(),
+      prisma.station.count(),
+      prisma.schedule.count(),
+      prisma.ticket.count(),
+      prisma.ticket.aggregate({
+        _sum: {
+          price: true
+        }
+      })
+    ]);
+
+    res.json({
+      totalUsers,
+      totalTrains,
+      totalStations,
+      totalSchedules,
+      totalTickets,
+      totalRevenue: totalRevenue._sum.price || 0
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+// Users management
+router.get('/users', isAdmin, async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      include: {
+        wallet: true,
+        _count: {
+          select: {
+            tickets: true
+          }
+        }
+      }
+    });
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
 // Trains management
 router.get('/trains', isAdmin, async (req, res) => {
   try {
@@ -137,6 +194,22 @@ router.post('/trains/deactivate', isAdmin, async (req, res) => {
   }
 });
 
+// Stations management
+router.get('/stations', isAdmin, async (req, res) => {
+  try {
+    const stations = await prisma.station.findMany({
+      include: {
+        departureSchedules: true,
+        arrivalSchedules: true
+      }
+    });
+    res.json(stations);
+  } catch (error) {
+    console.error('Error fetching stations:', error);
+    res.status(500).json({ error: 'Failed to fetch stations' });
+  }
+});
+
 // Schedules management
 router.get('/schedules', isAdmin, async (req, res) => {
   try {
@@ -159,7 +232,6 @@ router.get('/schedules', isAdmin, async (req, res) => {
         }
       }
     });
-    
     res.json(schedules);
   } catch (error) {
     console.error('Error fetching schedules:', error);
@@ -302,15 +374,10 @@ router.get('/seats', isAdmin, async (req, res) => {
   try {
     const seats = await prisma.seat.findMany({
       include: {
-        train: {
-          select: {
-            name: true,
-            trainNumber: true
-          }
-        }
+        train: true,
+        seatSchedules: true
       }
     });
-    
     res.json(seats);
   } catch (error) {
     console.error('Error fetching seats:', error);
@@ -537,14 +604,25 @@ router.post('/seat-schedules', isAdmin, async (req, res) => {
   }
 });
 
-// Stations management
-router.get('/stations', isAdmin, async (req, res) => {
+// Tickets management
+router.get('/tickets', isAdmin, async (req, res) => {
   try {
-    const stations = await prisma.station.findMany();
-    res.json(stations);
+    const tickets = await prisma.ticket.findMany({
+      include: {
+        user: true,
+        schedule: {
+          include: {
+            train: true,
+            fromStation: true,
+            toStation: true
+          }
+        }
+      }
+    });
+    res.json(tickets);
   } catch (error) {
-    console.error('Error fetching stations:', error);
-    res.status(500).json({ error: 'Failed to fetch stations' });
+    console.error('Error fetching tickets:', error);
+    res.status(500).json({ error: 'Failed to fetch tickets' });
   }
 });
 

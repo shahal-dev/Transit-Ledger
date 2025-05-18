@@ -8,7 +8,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -29,93 +28,66 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus } from "lucide-react";
 
 const formSchema = z.object({
-  trainId: z.string().min(1, "Train is required"),
   type: z.string().min(1, "Coach type is required"),
   coachNumber: z.string().min(1, "Coach number is required"),
   seatsPerCoach: z.string().min(1, "Seats per coach is required"),
   totalSeats: z.string().min(1, "Total seats is required"),
+  status: z.string().min(1, "Status is required"),
 });
 
-export function CreateBerthForm() {
-  const [open, setOpen] = useState(false);
-  const { useCreateBerth, useAllTrains } = useAdmin();
-  const { data: trains } = useAllTrains();
-  const createBerth = useCreateBerth();
+interface EditBerthFormProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  berth: any;
+}
+
+export function EditBerthForm({ open, onOpenChange, berth }: EditBerthFormProps) {
+  const { useManageBerth } = useAdmin();
+  const manageBerth = useManageBerth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      trainId: "",
-      type: "",
-      coachNumber: "",
-      seatsPerCoach: "",
-      totalSeats: "",
+      type: berth.type,
+      coachNumber: berth.coachNumber.toString(),
+      seatsPerCoach: berth.seatsPerCoach.toString(),
+      totalSeats: berth.totalSeats.toString(),
+      status: berth.status,
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      await createBerth.mutateAsync({
-        trainId: parseInt(values.trainId),
-        type: values.type,
-        coachNumber: parseInt(values.coachNumber),
-        seatsPerCoach: parseInt(values.seatsPerCoach),
-        totalSeats: parseInt(values.totalSeats),
+      await manageBerth.mutateAsync({
+        action: "update",
+        data: {
+          id: berth.id,
+          type: values.type,
+          coachNumber: parseInt(values.coachNumber),
+          seatsPerCoach: parseInt(values.seatsPerCoach),
+          totalSeats: parseInt(values.totalSeats),
+          status: values.status,
+        }
       });
-      setOpen(false);
-      form.reset();
+      onOpenChange(false);
     } catch (error) {
-      console.error("Failed to create berth:", error);
+      console.error("Failed to update berth:", error);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Berth
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create New Berth</DialogTitle>
+          <DialogTitle>Edit Berth</DialogTitle>
           <DialogDescription>
-            Add a new berth to the train. Fill in the details below.
+            Update the berth details below.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="trainId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Train</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a train" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {trains?.map((train: any) => (
-                        <SelectItem key={train.id} value={train.id.toString()}>
-                          {train.name} ({train.trainNumber})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="type"
@@ -181,9 +153,33 @@ export function CreateBerthForm() {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <DialogFooter>
-              <Button type="submit" disabled={createBerth.isPending}>
-                {createBerth.isPending ? "Creating..." : "Create Berth"}
+              <Button type="submit" disabled={manageBerth.isPending}>
+                {manageBerth.isPending ? "Updating..." : "Update Berth"}
               </Button>
             </DialogFooter>
           </form>

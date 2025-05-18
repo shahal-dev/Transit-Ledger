@@ -1,10 +1,41 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 export function useAdmin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+
+  // Admin login mutation
+  const useAdminLogin = () => {
+    return useMutation({
+      mutationFn: async (credentials: { username: string; password: string }) => {
+        const response = await apiRequest("POST", "/api/admin/login", credentials);
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Admin login failed");
+        }
+        return response.json();
+      },
+      onSuccess: (user) => {
+        queryClient.setQueryData(["/api/user"], user);
+        toast({
+          title: "Login successful",
+          description: `Welcome back, ${user.fullName}!`,
+        });
+        setLocation("/admin");
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "Login failed",
+          description: error.message || "Invalid admin credentials",
+          variant: "destructive",
+        });
+      },
+    });
+  };
 
   // Get all users
   const useAllUsers = () => {
@@ -233,12 +264,27 @@ export function useAdmin() {
   // Seat management
   const useManageSeat = () => {
     return useMutation({
-      mutationFn: async (data: any) => {
-        const response = await apiRequest("POST", "/api/admin/seats/manage", data);
+      mutationFn: async ({ seatId, action }: { seatId: number; action: string }) => {
+        const response = await apiRequest("POST", `/api/admin/seats/${action}`, { id: seatId });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to manage seat");
+        }
         return response.json();
       },
       onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Seat action completed successfully",
+        });
         queryClient.invalidateQueries({ queryKey: ['admin', 'seats'] });
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to perform seat action",
+          variant: "destructive",
+        });
       }
     });
   };
@@ -280,12 +326,27 @@ export function useAdmin() {
   // Ticket management
   const useManageTicket = () => {
     return useMutation({
-      mutationFn: async (data: any) => {
-        const response = await apiRequest("POST", "/api/admin/tickets/manage", data);
+      mutationFn: async ({ ticketId, action }: { ticketId: number; action: string }) => {
+        const response = await apiRequest("POST", `/api/admin/tickets/${action}`, { id: ticketId });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to manage ticket");
+        }
         return response.json();
       },
       onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Ticket action completed successfully",
+        });
         queryClient.invalidateQueries({ queryKey: ['admin', 'tickets'] });
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to perform ticket action",
+          variant: "destructive",
+        });
       }
     });
   };
@@ -337,6 +398,133 @@ export function useAdmin() {
     });
   };
 
+  // User management
+  const useManageUser = () => {
+    return useMutation({
+      mutationFn: async ({ userId, action }: { userId: number; action: string }) => {
+        const response = await apiRequest("POST", `/api/admin/users/${userId}/${action}`);
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to manage user");
+        }
+        return response.json();
+      },
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "User action completed successfully",
+        });
+        queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to perform user action",
+          variant: "destructive",
+        });
+      }
+    });
+  };
+
+  // Train management
+  const useManageTrain = () => {
+    return useMutation({
+      mutationFn: async ({ trainId, action }: { trainId: number; action: string }) => {
+        const response = await apiRequest("POST", `/api/admin/trains/${action}`, { id: trainId });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to manage train");
+        }
+        return response.json();
+      },
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Train action completed successfully",
+        });
+        queryClient.invalidateQueries({ queryKey: ['admin', 'trains'] });
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to perform train action",
+          variant: "destructive",
+        });
+      }
+    });
+  };
+
+  // Station management
+  const useManageStation = () => {
+    return useMutation({
+      mutationFn: async ({ stationId, action }: { stationId: number; action: string }) => {
+        const response = await apiRequest("POST", `/api/admin/stations/${action}`, { id: stationId });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to manage station");
+        }
+        return response.json();
+      },
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Station action completed successfully",
+        });
+        queryClient.invalidateQueries({ queryKey: ['admin', 'stations'] });
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to perform station action",
+          variant: "destructive",
+        });
+      }
+    });
+  };
+
+  // Schedule management
+  const useManageSchedule = () => {
+    return useMutation({
+      mutationFn: async ({ scheduleId, action }: { scheduleId: number; action: string }) => {
+        const response = await apiRequest("POST", `/api/admin/schedules/${action}`, { id: scheduleId });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to manage schedule");
+        }
+        return response.json();
+      },
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Schedule action completed successfully",
+        });
+        queryClient.invalidateQueries({ queryKey: ['admin', 'schedules'] });
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to perform schedule action",
+          variant: "destructive",
+        });
+      }
+    });
+  };
+
+  // Berth schedule management
+  const useAllBerthSchedules = () => {
+    return useQuery({
+      queryKey: ['admin', 'berth-schedules'],
+      queryFn: async () => {
+        const response = await apiRequest("GET", "/api/admin/berth-schedules");
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to fetch berth schedules");
+        }
+        return response.json();
+      }
+    });
+  };
+
   return {
     useCreateUser,
     useUpdateUser,
@@ -362,6 +550,12 @@ export function useAdmin() {
     useAllTickets,
     useManageBerth,
     useAllBerths,
-    useManageBerthSchedule
+    useManageBerthSchedule,
+    useAllBerthSchedules,
+    useAdminLogin,
+    useManageUser,
+    useManageTrain,
+    useManageStation,
+    useManageSchedule
   };
 } 
